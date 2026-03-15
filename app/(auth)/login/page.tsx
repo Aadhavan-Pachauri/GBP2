@@ -51,7 +51,13 @@ export default function LoginPage() {
 
     let cancelled = false;
     setStatusError(null);
-    fetch(`${base}/auth/status`, { headers: { Accept: "application/json" } }).then(async (r) => {
+    const headers = new Headers({ Accept: "application/json" });
+    try {
+      const host = new URL(base).hostname || "";
+      if (host.includes("ngrok")) headers.set("ngrok-skip-browser-warning", "true");
+    } catch (_e) {}
+
+    fetch(`${base}/auth/status`, { headers }).then(async (r) => {
       if (!r.ok) {
         const ct = r.headers.get("content-type") || "";
         const t = await r.text().catch(() => "");
@@ -59,6 +65,11 @@ export default function LoginPage() {
           throw new Error("Got HTML/404 (your API base is wrong). Use http://127.0.0.1:5050 or https://xxxx.ngrok.app");
         }
         throw new Error(t || r.statusText);
+      }
+      const ct = r.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) {
+        const t = await r.text().catch(() => "");
+        throw new Error(t.trim().startsWith("<!DOCTYPE") || t.trim().startsWith("<html") ? "Got HTML from server (ngrok warning or wrong URL)" : "Non-JSON response from server");
       }
       return r.json();
     })
